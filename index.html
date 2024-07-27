@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Aluminium Quotation App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            padding: 20px;
+        }
+        header {
+            background: linear-gradient(90deg, #4CAF50, #2196F3); /* Green to Blue gradient */
+            color: white;
+            padding: 15px 0;
+            text-align: center;
+            font-size: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .product-list, .quotation-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .product, .quotation {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex: 1 1 calc(50% - 30px);
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s;
+            border: 2px solid #2196F3; /* Blue */
+        }
+        .product:hover, .quotation:hover {
+            transform: translateY(-5px);
+        }
+        .form-section {
+            margin: 20px 0;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 2px solid #2196F3; /* Blue */
+        }
+        .form-section input, .form-section select, .form-section button {
+            width: calc(100% - 40px);
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .btn {
+            background: linear-gradient(90deg, #4CAF50, #2196F3); /* Green to Blue gradient */
+            color: white;
+            border: none;
+            padding: 15px;
+            text-align: center;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: linear-gradient(90deg, #45a049, #1a75d1); /* Darker Green to Blue gradient */
+        }
+    </style>
+</head>
+<body>
+
+<header>Star Aluminium Quotation App</header>
+
+<div class="container" id="main-screen">
+    <h2>Select a Product</h2>
+    <div class="product-list">
+        <div class="product" onclick="selectProduct('Window')">Window</div>
+        <div class="product" onclick="selectProduct('Door')">Door</div>
+        <div class="product" onclick="selectProduct('Dead Body Bed')">Dead Body Bed</div>
+        <div class="product" onclick="selectProduct('Stairs')">Stairs</div>
+        <div class="product" onclick="selectProduct('Glass Door')">Glass Door</div>
+    </div>
+</div>
+
+<div class="container" id="section-selection" style="display:none;">
+    <h2>Select Aluminium Sections for <span id="product-name"></span></h2>
+    <div class="form-section">
+        <label for="section">Section</label>
+        <select id="section">
+            <option value="Section1">$10/m</option>
+            <option value="Section2">$15/m</option>
+            <option value="Section3">$20/m</option>
+        </select>
+        <label for="quantity">Quantity (m)</label>
+        <input type="number" id="quantity">
+        <button class="btn" onclick="addSection()">Add Section</button>
+    </div>
+    <div class="form-section" id="selected-sections">
+        <h3>Selected Sections</h3>
+        <ul id="sections-list"></ul>
+        <button class="btn" onclick="generateQuotation()">Generate Quotation</button>
+    </div>
+</div>
+
+<div class="container" id="quotation-screen" style="display:none;">
+    <h2>Quotation for <span id="quotation-product"></span></h2>
+    <div class="form-section">
+        <ul id="quotation-details"></ul>
+        <h3>Total: $<span id="total-cost"></span></h3>
+        <button class="btn" onclick="saveQuotation()">Save Quotation</button>
+    </div>
+</div>
+
+<div class="container" id="quotation-list-screen" style="display:none;">
+    <h2>Past Quotations</h2>
+    <div class="quotation-list" id="quotations"></div>
+</div>
+
+<script>
+    let selectedProduct = '';
+    let sections = [];
+    let quotations = [];
+
+    function selectProduct(product) {
+        selectedProduct = product;
+        document.getElementById('product-name').innerText = product;
+        document.getElementById('main-screen').style.display = 'none';
+        document.getElementById('section-selection').style.display = 'block';
+    }
+
+    function addSection() {
+        const section = document.getElementById('section').value;
+        const quantity = document.getElementById('quantity').value;
+        sections.push({ section, quantity });
+        displaySelectedSections();
+    }
+
+    function displaySelectedSections() {
+        const sectionsList = document.getElementById('sections-list');
+        sectionsList.innerHTML = '';
+        sections.forEach((s, index) => {
+            sectionsList.innerHTML += `<li>${s.section}: ${s.quantity}m - <button onclick="removeSection(${index})">Remove</button></li>`;
+        });
+    }
+
+    function removeSection(index) {
+        sections.splice(index, 1);
+        displaySelectedSections();
+    }
+
+    function generateQuotation() {
+        let totalCost = 0;
+        const detailsList = document.getElementById('quotation-details');
+        detailsList.innerHTML = '';
+        sections.forEach(s => {
+            const price = parseInt(s.section.split('$')[1].split('/')[0]);
+            const cost = price * s.quantity;
+            totalCost += cost;
+            detailsList.innerHTML += `<li>${s.section}: ${s.quantity}m - $${cost}</li>`;
+        });
+        document.getElementById('total-cost').innerText = totalCost;
+        document.getElementById('quotation-product').innerText = selectedProduct;
+        document.getElementById('section-selection').style.display = 'none';
+        document.getElementById('quotation-screen').style.display = 'block';
+    }
+
+    function saveQuotation() {
+        const quotation = {
+            product: selectedProduct,
+            sections,
+            totalCost: document.getElementById('total-cost').innerText
+        };
+        quotations.push(quotation);
+        displayQuotations();
+        document.getElementById('quotation-screen').style.display = 'none';
+        document.getElementById('main-screen').style.display = 'block';
+        sections = [];
+    }
+
+    function displayQuotations() {
+        const quotationsList = document.getElementById('quotations');
+        quotationsList.innerHTML = '';
+        quotations.forEach(q => {
+            quotationsList.innerHTML += `<div class="quotation">
+                <h3>${q.product}</h3>
+                <p>Total Cost: $${q.totalCost}</p>
+                <ul>${q.sections.map(s => `<li>${s.section}: ${s.quantity}m</li>`).join('')}</ul>
+            </div>`;
+        });
+    }
+</script>
+
+</body>
+</html>
