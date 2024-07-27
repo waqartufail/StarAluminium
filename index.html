@@ -11,9 +11,6 @@
             padding: 0;
             background-color: #f4f4f4;
         }
-        .container {
-            padding: 20px;
-        }
         header {
             background: linear-gradient(90deg, #4CAF50, #2196F3); /* Green to Blue gradient */
             color: white;
@@ -21,13 +18,21 @@
             text-align: center;
             font-size: 24px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: relative;
         }
-        .product-list, .quotation-list {
+        .cart-icon {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            cursor: pointer;
+            display: none; /* Hidden initially */
+        }
+        .product-list, .sections-table {
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
         }
-        .product, .quotation {
+        .product, .cart-item, .section-item {
             background-color: white;
             border-radius: 10px;
             padding: 20px;
@@ -38,7 +43,7 @@
             transition: transform 0.3s;
             border: 2px solid #2196F3; /* Blue */
         }
-        .product:hover, .quotation:hover {
+        .product:hover, .cart-item:hover, .section-item:hover {
             transform: translateY(-5px);
         }
         .form-section {
@@ -72,11 +77,46 @@
         .btn:hover {
             background: linear-gradient(90deg, #45a049, #1a75d1); /* Darker Green to Blue gradient */
         }
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5); /* Black w/ opacity */
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            border-radius: 10px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover, .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
-<header>Star Aluminium Quotation App</header>
+<header>
+    Star Aluminium Quotation App
+    <div class="cart-icon" onclick="openCartModal()">
+        🛒 <span id="cart-count">0</span>
+    </div>
+</header>
 
 <div class="container" id="main-screen">
     <h2>Select a Product</h2>
@@ -87,6 +127,7 @@
         <div class="product" onclick="selectProduct('Stairs')">Stairs</div>
         <div class="product" onclick="selectProduct('Glass Door')">Glass Door</div>
     </div>
+    <button class="btn" onclick="generateQuotationFromCart()">Generate Quotation</button>
 </div>
 
 <div class="container" id="section-selection" style="display:none;">
@@ -94,40 +135,49 @@
     <div class="form-section">
         <label for="section">Section</label>
         <select id="section">
-            <option value="Section1">$10/m</option>
-            <option value="Section2">$15/m</option>
-            <option value="Section3">$20/m</option>
+            <option value="Section1" data-price="10">Section1 - $10/m</option>
+            <option value="Section2" data-price="15">Section2 - $15/m</option>
+            <option value="Section3" data-price="20">Section3 - $20/m</option>
         </select>
         <label for="quantity">Quantity (m)</label>
-        <input type="number" id="quantity">
+        <input type="number" id="quantity" min="1">
         <button class="btn" onclick="addSection()">Add Section</button>
     </div>
     <div class="form-section" id="selected-sections">
         <h3>Selected Sections</h3>
-        <ul id="sections-list"></ul>
-        <button class="btn" onclick="generateQuotation()">Generate Quotation</button>
+        <div class="sections-table" id="sections-list">
+            <!-- Sections will be displayed here -->
+        </div>
+    </div>
+    <button class="btn" onclick="addToCart()">Add to Cart</button>
+</div>
+
+<div class="modal" id="cart-modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeCartModal()">&times;</span>
+        <h2>Cart Items</h2>
+        <div id="cart-items-modal">
+            <!-- Cart items will be displayed here -->
+        </div>
     </div>
 </div>
 
-<div class="container" id="quotation-screen" style="display:none;">
-    <h2>Quotation for <span id="quotation-product"></span></h2>
-    <div class="form-section">
-        <ul id="quotation-details"></ul>
+<div class="modal" id="quotation-modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeQuotationModal()">&times;</span>
+        <h2>Quotation</h2>
+        <p id="quotation-text"></p>
         <h3>Total: $<span id="total-cost"></span></h3>
-        <button class="btn" onclick="saveQuotation()">Save Quotation</button>
+        <button class="btn" onclick="printQuotation()">Print</button>
+        <button class="btn" onclick="bookPO()">Book PO</button>
     </div>
-</div>
-
-<div class="container" id="quotation-list-screen" style="display:none;">
-    <h2>Past Quotations</h2>
-    <div class="quotation-list" id="quotations"></div>
 </div>
 
 <script>
     let selectedProduct = '';
     let sections = [];
-    let quotations = [];
-
+    let cart = [];
+    
     function selectProduct(product) {
         selectedProduct = product;
         document.getElementById('product-name').innerText = product;
@@ -136,64 +186,101 @@
     }
 
     function addSection() {
-        const section = document.getElementById('section').value;
-        const quantity = document.getElementById('quantity').value;
-        sections.push({ section, quantity });
-        displaySelectedSections();
+        const sectionSelect = document.getElementById('section');
+        const section = sectionSelect.options[sectionSelect.selectedIndex].value;
+        const price = parseInt(sectionSelect.options[sectionSelect.selectedIndex].getAttribute('data-price'));
+        const quantity = parseInt(document.getElementById('quantity').value);
+        const sectionCost = price * quantity;
+        
+        const sectionItem = document.createElement('div');
+        sectionItem.className = 'section-item';
+        sectionItem.innerHTML = `${section}: ${quantity}m - $${sectionCost} <button class="btn" onclick="removeSection(this)">Remove</button>`;
+        document.getElementById('sections-list').appendChild(sectionItem);
+        
+        sections.push({ section, quantity, cost: sectionCost });
     }
 
-    function displaySelectedSections() {
-        const sectionsList = document.getElementById('sections-list');
-        sectionsList.innerHTML = '';
-        sections.forEach((s, index) => {
-            sectionsList.innerHTML += `<li>${s.section}: ${s.quantity}m - <button onclick="removeSection(${index})">Remove</button></li>`;
-        });
-    }
-
-    function removeSection(index) {
+    function removeSection(button) {
+        const sectionItem = button.parentElement;
+        const index = Array.from(sectionItem.parentElement.children).indexOf(sectionItem);
         sections.splice(index, 1);
-        displaySelectedSections();
+        sectionItem.remove();
     }
 
-    function generateQuotation() {
-        let totalCost = 0;
-        const detailsList = document.getElementById('quotation-details');
-        detailsList.innerHTML = '';
-        sections.forEach(s => {
-            const price = parseInt(s.section.split('$')[1].split('/')[0]);
-            const cost = price * s.quantity;
-            totalCost += cost;
-            detailsList.innerHTML += `<li>${s.section}: ${s.quantity}m - $${cost}</li>`;
-        });
-        document.getElementById('total-cost').innerText = totalCost;
-        document.getElementById('quotation-product').innerText = selectedProduct;
-        document.getElementById('section-selection').style.display = 'none';
-        document.getElementById('quotation-screen').style.display = 'block';
-    }
-
-    function saveQuotation() {
-        const quotation = {
+    function addToCart() {
+        const totalCost = sections.reduce((sum, item) => sum + item.cost, 0);
+        const cartItem = {
             product: selectedProduct,
-            sections,
-            totalCost: document.getElementById('total-cost').innerText
+            sections: [...sections],
+            totalCost: totalCost
         };
-        quotations.push(quotation);
-        displayQuotations();
-        document.getElementById('quotation-screen').style.display = 'none';
-        document.getElementById('main-screen').style.display = 'block';
+        cart.push(cartItem);
         sections = [];
+        document.getElementById('sections-list').innerHTML = ''; // Clear section list
+        displayCart();
+        document.getElementById('section-selection').style.display = 'none';
+        document.getElementById('main-screen').style.display = 'block';
+        updateCartCount();
     }
 
-    function displayQuotations() {
-        const quotationsList = document.getElementById('quotations');
-        quotationsList.innerHTML = '';
-        quotations.forEach(q => {
-            quotationsList.innerHTML += `<div class="quotation">
-                <h3>${q.product}</h3>
-                <p>Total Cost: $${q.totalCost}</p>
-                <ul>${q.sections.map(s => `<li>${s.section}: ${s.quantity}m</li>`).join('')}</ul>
-            </div>`;
+    function displayCart() {
+        const cartItems = document.getElementById('cart-items-modal');
+        cartItems.innerHTML = '';
+        cart.forEach((item, index) => {
+            const cartItem = document.createElement('div');
+            cartItem.className = 'cart-item';
+            cartItem.innerHTML = `<h4>${item.product}</h4>
+                                  ${item.sections.map(section => `<p>${section.section}: ${section.quantity}m - $${section.cost}</p>`).join('')}
+                                  <h4>Total: $${item.totalCost}</h4>`;
+            cartItems.appendChild(cartItem);
         });
+    }
+
+    function updateCartCount() {
+        const cartCount = document.getElementById('cart-count');
+        cartCount.innerText = cart.length;
+        document.querySelector('.cart-icon').style.display = cart.length > 0 ? 'block' : 'none';
+    }
+
+    function openCartModal() {
+        displayCart();
+        document.getElementById('cart-modal').style.display = 'block';
+    }
+
+    function closeCartModal() {
+        document.getElementById('cart-modal').style.display = 'none';
+    }
+
+    function generateQuotationFromCart() {
+        let totalCost = 0;
+        let quotationText = 'Quotation for your selected items:\n';
+        cart.forEach(item => {
+            quotationText += `${item.product}:\n`;
+            item.sections.forEach(section => {
+                quotationText += `  ${section.section}: ${section.quantity}m - $${section.cost}\n`;
+            });
+            totalCost += item.totalCost;
+        });
+        document.getElementById('quotation-text').innerText = quotationText;
+        document.getElementById('total-cost').innerText = totalCost;
+        document.getElementById('quotation-modal').style.display = 'block';
+    }
+
+    function printQuotation() {
+        window.print();
+    }
+
+    function bookPO() {
+        alert('PO booked successfully!');
+        cart = [];
+        displayCart();
+        updateCartCount();
+        closeQuotationModal();
+        document.getElementById('main-screen').style.display = 'block';
+    }
+
+    function closeQuotationModal() {
+        document.getElementById('quotation-modal').style.display = 'none';
     }
 </script>
 
